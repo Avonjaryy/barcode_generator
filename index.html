@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Générateur de code-barres</title>
+<style>
+:root{--bg:#f2f5fa;--card:#fff;--ink:#1b2233;--muted:#667089;--line:#dfe4ee;--accent:#1f5eff;--err:#c62828;--ok:#1b7f4b;--warn:#a05a00}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1320;--card:#171e2e;--ink:#e8ecf7;--muted:#97a1bb;--line:#2a3350;--accent:#5b8cff;--err:#ff7b7b;--ok:#4cd08a;--warn:#ffb454}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45;padding:20px 16px 40px}
+main{max-width:980px;margin:0 auto}
+header{margin-bottom:18px}
+h1{margin:0 0 4px;font-size:clamp(20px,4vw,28px);letter-spacing:-.3px}
+header p{margin:0;color:var(--muted);font-size:14px}
+.grid{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:760px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 2px 14px rgba(20,30,60,.06)}
+label,.lbl{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;margin:14px 0 6px}
+label:first-child{margin-top:0}
+output{font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
+select,input[type=text]{width:100%;padding:11px 12px;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;font-family:inherit}
+input[type=text]{font-family:ui-monospace,Menlo,Consolas,monospace}
+select:focus,input[type=text]:focus{outline:2px solid var(--accent);border-color:transparent}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.hint{font-size:12px;color:var(--muted);margin-top:6px}
+.msg{font-size:13px;margin-top:8px;min-height:1.2em}
+.msg.err{color:var(--err)}.msg.warn{color:var(--warn)}.msg.ok{color:var(--ok)}
+.link{background:none;border:0;color:var(--accent);cursor:pointer;font-size:12px;padding:0;margin-top:6px;text-decoration:underline;font-family:inherit}
+.chk{justify-content:flex-start;gap:8px;font-weight:500;cursor:pointer}
+.chk input{width:18px;height:18px;accent-color:var(--accent)}
+.colors{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.colors label{justify-content:space-between;margin:0;font-weight:500}
+input[type=color]{width:42px;height:32px;padding:0;border:1px solid var(--line);border-radius:8px;background:none;cursor:pointer}
+#view{display:flex;align-items:center;justify-content:center;min-height:200px;border-radius:10px;border:1px dashed var(--line);padding:14px;background:#fff;overflow:hidden}
+#view svg{max-width:100%;height:auto;display:block}
+#view .placeholder{color:#667089;font-size:14px;text-align:center;padding:20px}
+#info{font-size:13px;color:var(--muted);margin:12px 0 0;min-height:1.3em}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.btn{flex:1;min-width:110px;padding:12px 16px;border:0;border-radius:10px;font:700 15px system-ui,sans-serif;color:#fff;background:var(--accent);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:not(:disabled):hover{filter:brightness(1.1)}
+@media print{
+  body{background:#fff;padding:0}
+  header,.panel:not(.out),.actions,#info{display:none!important}
+  .out{border:0;box-shadow:none;padding:0}
+  #view{border:0}
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Générateur de code-barres</h1>
+    <p>Tout se fait dans ton navigateur, sans connexion. Les codes générés sont lisibles par les scanners standards.</p>
+  </header>
+
+  <div class="grid">
+    <section class="panel">
+      <label for="fmt">Format</label>
+      <select id="fmt">
+        <option value="code128">Code 128 (texte libre)</option>
+        <option value="ean13">EAN-13 (produits)</option>
+        <option value="ean8">EAN-8 (petits produits)</option>
+        <option value="upca">UPC-A (produits US)</option>
+        <option value="code39">Code 39 (industrie)</option>
+      </select>
+
+      <label for="val">Valeur</label>
+      <input type="text" id="val" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="hint" id="hint"></div>
+      <div class="msg" id="msg"></div>
+      <button class="link" id="exBtn" type="button">Utiliser un exemple</button>
+
+      <label for="mw">Épaisseur des barres <output id="mwO"></output></label>
+      <input type="range" id="mw" min="1" max="8" step="1" value="3">
+
+      <label for="h">Hauteur <output id="hO"></output></label>
+      <input type="range" id="h" min="40" max="240" step="5" value="110">
+
+      <label class="chk"><input type="checkbox" id="txt" checked> Afficher le texte sous les barres</label>
+
+      <div class="lbl">Couleurs</div>
+      <div class="colors">
+        <label>Barres <input type="color" id="fg" value="#000000"></label>
+        <label>Fond <input type="color" id="bg" value="#ffffff"></label>
+      </div>
+    </section>
+
+    <section class="panel out">
+      <div id="view"></div>
+      <div id="info"></div>
+      <div class="actions">
+        <button class="btn" id="pngBtn" type="button">Télécharger PNG</button>
+        <button class="btn ghost" id="svgBtn" type="button">SVG</button>
+        <button class="btn ghost" id="printBtn" type="button">Imprimer</button>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+'use strict';
+
+const C128=[
+'212222','222122','222221','121223','121322','131222','122213','122312','132212','221213',
+'221312','231212','112232','122132','122231','113222','123122','123221','223211','221132',
+'221231','213212','223112','312131','311222','321122','321221','312212','322112','322211',
+'212123','212321','232121','111323','131123','131321','112313','132113','132311','211313',
+'231113','231311','112133','112331','132131','113123','113321','133121','313121','211331',
+'231131','213113','213311','213131','311123','311321','331121','312113','312311','332111',
+'314111','221411','431111','111224','111422','121124','121421','141122','141221','112214',
+'112412','122114','122411','142112','142211','241211','221114','413111','241112','134111',
+'111242','121142','121241','114212','124112','124211','411212','421112','421211','212141',
+'214121','412121','111143','111341','131141','114113','114311','411113','411311','113141',
+'114131','311141','411131','211412','211214','211232','2331112'];
+
+function encode128(text){
+  const n=text.length;
+  for(let i=0;i<n;i++){
+    const c=text.charCodeAt(i);
+    if(c<32||c>126)return{error:`Caractère non pris en charge : « ${text[i]} ». Code 128 n'accepte que l'ASCII (sans accents).`,accents:/[À-ſ]/.test(text)};
+  }
+  if(n>80)return{error:'80 caractères maximum.'};
+  const run=i=>{let r=0;while(i+r<n&&text[i+r]>='0'&&text[i+r]<='9')r++;return r;};
+  const codes=[];let set=null,i=0;
+  while(i<n){
+    const r=run(i);
+    if(set==='C'){
+      if(r>=2){codes.push(+text.substr(i,2));i+=2;}
+      else{codes.push(100);set='B';}           
+      continue;
+    }
+    if(r>=(set===null?4:6)||(r>=4&&i+r===n)){  
+      if(r%2===1){                             
+        if(set===null){codes.push(104);set='B';}
+        codes.push(text.charCodeAt(i)-32);i++;
+      }
+      codes.push(set===null?105:99);set='C';
+      continue;
+    }
+    if(set===null){codes.push(104);set='B';}
+    codes.push(text.charCodeAt(i)-32);i++;
+  }
+  let sum=codes[0];
+  for(let k=1;k<codes.length;k++)sum+=codes[k]*k;
+  codes.push(sum%103);codes.push(106);
+  let bars='';
+  for(const c of codes){
+    const p=C128[c];
+    for(let k=0;k<p.length;k++)bars+=(k%2===0?'1':'0').repeat(+p[k]);
+  }
+  return{bars,label:text,note:`${codes.length-2} symboles, clé de contrôle ${sum%103}`};
+}
+
+const C39={
+'0':'nnnwwnwnn','1':'wnnwnnnnw','2':'nnwwnnnnw','3':'wnwwnnnnn','4':'nnnwwnnnw','5':'wnnwwnnnn',
+'6':'nnwwwnnnn','7':'nnnwnnwnw','8':'wnnwnnwnn','9':'nnwwnnwnn','A':'wnnnnwnnw','B':'nnwnnwnnw',
+'C':'wnwnnwnnn','D':'nnnnwwnnw','E':'wnnnwwnnn','F':'nnwnwwnnn','G':'nnnnnwwnw','H':'wnnnnwwnn',
+'I':'nnwnnwwnn','J':'nnnnwwwnn','K':'wnnnnnnww','L':'nnwnnnnww','M':'wnwnnnnwn','N':'nnnnwnnww',
+'O':'wnnnwnnwn','P':'nnwnwnnwn','Q':'nnnnnnwww','R':'wnnnnnwwn','S':'nnwnnnwwn','T':'nnnnwnwwn',
+'U':'wwnnnnnnw','V':'nwwnnnnnw','W':'wwwnnnnnn','X':'nwnnwnnnw','Y':'wwnnwnnnn','Z':'nwwnwnnnn',
+'-':'nwnnnnwnw','.':'wwnnnnwnn',' ':'nwwnnnwnn','$':'nwnwnwnnn','/':'nwnwnnnwn','+':'nwnnnwnwn',
+'%':'nnnwnwnwn','*':'nwnnwnwnn'};
+
+function encode39(raw){
+  const s=raw.toUpperCase();
+  for(const ch of s){
+    if(ch==='*'||!C39[ch])return{error:`Caractère non pris en charge : « ${ch} ». Code 39 : A-Z, 0-9, espace et - . $ / + %`};
+  }
+  if(s.length>40)return{error:'40 caractères maximum.'};
+  const full='*'+s+'*';
+  const parts=[];
+  for(const ch of full){
+    let b='';
+    for(let k=0;k<9;k++)b+=(k%2===0?'1':'0').repeat(C39[ch][k]==='w'?3:1);
+    parts.push(b);
+  }
+  return{bars:parts.join('0'),label:s,note:`${s.length} caractère(s) + délimiteurs *`};
+}
+
+const EL=['0001101','0011001','0010011','0111101','0100011','0110001','0101111','0111011','0110111','0001011'];
+const EG=['0100111','0110011','0011011','0100001','0011101','0111001','0000101','0010001','0001001','0010111'];
+const ER=['1110010','1100110','1101100','1000010','1011100','1001110','1010000','1000100','1001000','1110100'];
+const EPAR=['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG','LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL'];
+const EANCFG={
+  ean13:{len:12,name:'EAN-13'},
+  ean8:{len:7,name:'EAN-8'},
+  upca:{len:11,name:'UPC-A'}
+};
+function eanCheck(d){
+  let sum=0;
+  for(let i=0;i<d.length;i++)sum+=d[i]*((d.length-1-i)%2===0?3:1);
+  return (10-sum%10)%10;
+}
+function encodeEAN(kind,raw){
+  const cfg=EANCFG[kind],len=cfg.len;
+  const s=raw.replace(/[\s-]/g,'');
+  if(!/^\d+$/.test(s))return{error:'Uniquement des chiffres (0 à 9).'};
+  if(s.length<len)return{pending:`Encore ${len-s.length} chiffre(s) : ${len} chiffres, le chiffre de contrôle est ajouté automatiquement.`};
+  if(s.length>len+1)return{error:`${cfg.name} : ${len} chiffres, ou ${len+1} avec le chiffre de contrôle.`};
+  const data=s.slice(0,len).split('').map(Number);
+  const chk=eanCheck(data);
+  let note;
+  if(s.length===len+1){
+    if(+s[len]!==chk)return{error:`Chiffre de contrôle incorrect : attendu ${chk}, saisi ${s[len]}.`};
+    note='Chiffre de contrôle vérifié ✓';
+  }else note=`Chiffre de contrôle ajouté : ${chk}`;
+  const digits=data.concat(chk);
+  let bars;
+  if(kind==='ean8'){
+    bars='101'+digits.slice(0,4).map(d=>EL[d]).join('')+'01010'+digits.slice(4).map(d=>ER[d]).join('')+'101';
+    return{bars,ean:'ean8',digits,guards:[[0,3],[32,37],[64,67]],label:digits.join(''),note};
+  }
+  const full=kind==='upca'?[0].concat(digits):digits;
+  const pat=EPAR[full[0]];
+  bars='101'+full.slice(1,7).map((d,i)=>pat[i]==='L'?EL[d]:EG[d]).join('')+'01010'+full.slice(7).map(d=>ER[d]).join('')+'101';
+  return{bars,ean:kind,digits,guards:kind==='upca'?[[0,10],[45,50],[85,95]]:[[0,3],[45,50],[92,95]],label:digits.join(''),note};
+}
+
+function encode(kind,raw){
+  if(!raw)return{empty:true};
+  if(kind==='code128')return encode128(raw);
+  if(kind==='code39')return encode39(raw);
+  return encodeEAN(kind,raw);
+}
+
+const FONT='ui-monospace,Menlo,Consolas,"Liberation Mono",monospace';
+function layout(enc,o){
+  const mw=o.mw,H=o.h,qz=10*mw,vm=Math.max(8,mw*4);
+  const fs=Math.round(mw*7+4);
+  const n=enc.bars.length,W=qz*2+n*mw;
+  const ean=!!enc.guards,showT=o.text;
+  const gh=ean&&showT?Math.round(fs*.9):0;           
+  const inG=i=>gh>0&&enc.guards.some(g=>i>=g[0]&&i<g[1]);
+  const rects=[],texts=[];
+  for(let i=0;i<n;){
+    if(enc.bars[i]!=='1'){i++;continue;}
+    const g=inG(i);let j=i;
+    while(j<n&&enc.bars[j]==='1'&&inG(j)===g)j++;
+    rects.push([qz+i*mw,vm,(j-i)*mw,H+(g?gh:0)]);
+    i=j;
+  }
+  let textH=0;
+  if(showT){
+    if(ean){
+      const d=enc.digits,y=vm+H+gh-1,slot=(start,j)=>qz+(start+7*j+3.5)*mw;
+      const add=(s,x,anchor)=>texts.push({s:String(s),x,y,size:fs,anchor:anchor||'middle'});
+      if(enc.ean==='ean8'){
+        for(let j=0;j<4;j++)add(d[j],slot(3,j));
+        for(let j=0;j<4;j++)add(d[4+j],slot(36,j));
+      }else if(enc.ean==='ean13'){
+        add(d[0],qz-mw*1.5,'end');
+        for(let j=0;j<6;j++)add(d[1+j],slot(3,j));
+        for(let j=0;j<6;j++)add(d[7+j],slot(50,j));
+      }else{
+        add(d[0],qz-mw*1.5,'end');
+        for(let j=1;j<6;j++)add(d[j],slot(3,j));
+        for(let j=0;j<5;j++)add(d[6+j],slot(50,j));
+        add(d[11],qz+n*mw+mw*1.5,'start');
+      }
+      textH=gh;
+    }else{
+      texts.push({s:enc.label,x:W/2,y:vm+H+fs+3,size:fs,anchor:'middle'});
+      textH=fs+6;
+    }
+  }
+  return{w:W,h:vm*2+H+textH,rects,texts};
+}
+
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function buildSVG(L,o){
+  let d='';
+  for(const r of L.rects)d+=`M${r[0]} ${r[1]}h${r[2]}v${r[3]}h-${r[2]}z`;
+  const t=L.texts.map(t=>`<text x="${t.x}" y="${t.y}" font-size="${t.size}" text-anchor="${t.anchor}" fill="${o.fg}">${esc(t.s)}</text>`).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${L.w} ${L.h}" width="${L.w}" height="${L.h}" font-family="ui-monospace,Menlo,Consolas,monospace"><rect width="100%" height="100%" fill="${o.bg}"/><path d="${d}" fill="${o.fg}" shape-rendering="crispEdges"/>${t}</svg>`;
+}
+function buildCanvas(L,o){
+  const s=Math.max(1,Math.ceil(700/L.w));            
+  const c=document.createElement('canvas');c.width=L.w*s;c.height=L.h*s;
+  const x=c.getContext('2d');x.scale(s,s);
+  x.fillStyle=o.bg;x.fillRect(0,0,L.w,L.h);
+  x.fillStyle=o.fg;
+  for(const r of L.rects)x.fillRect(r[0],r[1],r[2],r[3]);
+  x.textBaseline='alphabetic';
+  for(const t of L.texts){x.font=`${t.size}px ${FONT}`;x.textAlign=t.anchor==='middle'?'center':t.anchor;x.fillText(t.s,t.x,t.y);}
+  return c;
+}
+
+const FORMATS={
+  code128:{hint:'Texte, chiffres et symboles (ASCII, sans accents). Le plus polyvalent.',ex:'CNTEMAD-2026'},
+  ean13:{hint:'12 chiffres : le 13e (chiffre de contrôle) est calculé pour toi.',ex:'590123412345'},
+  ean8:{hint:'7 chiffres : le 8e (chiffre de contrôle) est calculé pour toi.',ex:'9638507'},
+  upca:{hint:'11 chiffres : le 12e (chiffre de contrôle) est calculé pour toi.',ex:'03600029145'},
+  code39:{hint:'Majuscules, chiffres, espace et - . $ / + %',ex:'ABC-1234'}
+};
+
+if(typeof document!=='undefined'){
+  const $=id=>document.getElementById(id);
+  let current=null;   
+
+  function lum(hex){
+    const v=[1,3,5].map(i=>{const c=parseInt(hex.slice(i,i+2),16)/255;return c<=.03928?c/12.92:Math.pow((c+.055)/1.055,2.4);});
+    return .2126*v[0]+.7152*v[1]+.0722*v[2];
+  }
+  function opts(){
+    return{mw:+$('mw').value,h:+$('h').value,text:$('txt').checked,fg:$('fg').value,bg:$('bg').value};
+  }
+  function setMsg(cls,txt,extra){
+    const m=$('msg');m.className='msg '+cls;m.textContent=txt||'';
+    if(extra){
+      const b=document.createElement('button');b.className='link';b.type='button';b.textContent=extra.label;b.style.marginLeft='8px';
+      b.onclick=extra.fn;m.appendChild(b);
+    }
+  }
+  function placeholder(txt){
+    $('view').innerHTML='<div class="placeholder"></div>';
+    $('view').firstChild.textContent=txt;
+  }
+  function render(){
+    const kind=$('fmt').value,raw=$('val').value,o=opts();
+    $('mwO').textContent=o.mw+' px';$('hO').textContent=o.h+' px';
+    $('hint').textContent=FORMATS[kind].hint;
+    $('val').placeholder='Ex : '+FORMATS[kind].ex;
+    const enc=encode(kind,raw);
+    current=null;
+    for(const id of['pngBtn','svgBtn','printBtn'])$(id).disabled=true;
+    $('info').textContent='';
+    if(enc.empty){setMsg('','');placeholder('Saisis une valeur pour générer le code-barres.');return;}
+    if(enc.pending){setMsg('','');$('hint').textContent=enc.pending;placeholder('…');return;}
+    if(enc.error){
+      setMsg('err',enc.error,enc.accents?{label:'Retirer les accents',fn:()=>{$('val').value=$('val').value.normalize('NFD').replace(/[̀-ͯ]/g,'');render();}}:null);
+      placeholder('Code-barres impossible avec cette valeur.');return;
+    }
+    const L=layout(enc,o);
+    $('view').innerHTML=buildSVG(L,{fg:o.fg,bg:o.bg});
+    $('view').style.background=o.bg;
+    current={L,o,enc};
+    for(const id of['pngBtn','svgBtn','printBtn'])$(id).disabled=false;
+    if(lum(o.fg)>=lum(o.bg))setMsg('warn','Les barres doivent être plus sombres que le fond pour être lues par la plupart des scanners.');
+    else setMsg('ok',enc.note||'');
+    $('info').textContent=`Taille : ${L.w} × ${L.h} px (le SVG s'agrandit sans perte).`;
+    try{localStorage.setItem('barcode_prefs',JSON.stringify({kind,mw:o.mw,h:o.h,text:o.text,fg:o.fg,bg:o.bg}));}catch(e){}
+  }
+
+  function download(blob,name){
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  }
+  const fname=ext=>'barcode-'+$('fmt').value+'-'+($('val').value.replace(/[^\p{L}\p{N}_-]+/gu,'_').slice(0,24)||'code')+'.'+ext;
+
+  $('pngBtn').onclick=()=>{if(!current)return;buildCanvas(current.L,current.o).toBlob(b=>download(b,fname('png')),'image/png');};
+  $('svgBtn').onclick=()=>{if(!current)return;download(new Blob([buildSVG(current.L,current.o)],{type:'image/svg+xml'}),fname('svg'));};
+  $('printBtn').onclick=()=>{if(current)window.print();};
+  $('exBtn').onclick=()=>{$('val').value=FORMATS[$('fmt').value].ex;render();$('val').focus();};
+  $('fmt').onchange=()=>{
+    const k=$('fmt').value;
+    if($('val').value===''||Object.values(FORMATS).some(f=>f.ex===$('val').value))$('val').value=FORMATS[k].ex;
+    render();
+  };
+  for(const id of['val','mw','h','txt','fg','bg'])$(id).addEventListener('input',render);
+
+  try{
+    const p=JSON.parse(localStorage.getItem('barcode_prefs')||'null');
+    if(p){
+      if(FORMATS[p.kind])$('fmt').value=p.kind;
+      $('mw').value=p.mw;$('h').value=p.h;$('txt').checked=!!p.text;$('fg').value=p.fg;$('bg').value=p.bg;
+    }
+  }catch(e){}
+  $('val').value=FORMATS[$('fmt').value].ex;
+  render();
+}
+</script>
+</body>
+</html>
